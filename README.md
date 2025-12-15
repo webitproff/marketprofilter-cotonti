@@ -6,8 +6,15 @@ Field types: `select`, `radio`, `checkbox`, and `range`.
 Parameter names and their values used for filtering are specified in the plugin admin panel, and each supports multilingualism. When editing a product, we mark the required characteristic values of existing parameters for filtering.  
 Parameter names can be generic for all products, as well as specialized (class-based).
 
----
 
+<img src="https://raw.githubusercontent.com/webitproff/marketprofilter-cotonti/refs/heads/main/Market-PRO-product-filter-plugin-Cotonti-by-webitproff.webp" alt="Market PRO Filter plugin Cotonti CMF by webitproff">
+
+---
+# [Demo](https://abuyfile.com/ru/market/cotonti/plugs)
+# [Support](https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter)
+# [Source code on GitHub](https://github.com/webitproff/marketprofilter-cotonti)
+
+---
 ## Examples
 
 ### 1. Common parameters
