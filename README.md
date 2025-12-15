@@ -16,10 +16,10 @@ Parameter names can be generic for all products, as well as specialized (class-b
 <img src="https://raw.githubusercontent.com/webitproff/marketprofilter-cotonti/refs/heads/main/Market-PRO-product-filter-plugin-Cotonti-by-webitproff.webp" alt="Market PRO Filter plugin Cotonti CMF by webitproff">
 
 ---
-# [Demo](https://abuyfile.com/ru/market/cotonti/plugs)
-# [Support](https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter)
-# [Source code on GitHub](https://github.com/webitproff/marketprofilter-cotonti)
-
+### [Demo](https://abuyfile.com/ru/market/cotonti/plugs)
+### [Support](https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter)
+### [Source code on GitHub](https://github.com/webitproff/marketprofilter-cotonti)
+### [Releases](https://github.com/webitproff/marketprofilter-cotonti/releases)
 ---
 ## Examples
 
