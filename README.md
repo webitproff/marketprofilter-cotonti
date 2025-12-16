@@ -7,11 +7,13 @@ Field types: `select`, `radio`, `checkbox`, and `range`.
 Parameter names and their values used for filtering are specified in the plugin admin panel, and each supports multilingualism. When editing a product, we mark the required characteristic values of existing parameters for filtering.  
 Parameter names can be generic for all products, as well as specialized (class-based).
 
-[![License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/webitproff/marketprofilter-cotonti/blob/main/LICENSE)
+
 [![Version](https://img.shields.io/badge/version-2.2.1-green.svg)](https://github.com/webitproff/marketprofilter-cotonti/releases)
 [![Cotonti Compatibility](https://img.shields.io/badge/Cotonti_Siena-0.9.26-orange.svg)](https://github.com/Cotonti/Cotonti)
-[![PHP](https://img.shields.io/badge/PHP-8.4-blueviolet.svg)](https://www.php.net/releases/8_4_0.php)
+[![PHP](https://img.shields.io/badge/PHP-8.4-purple.svg)](https://www.php.net/releases/8_4_0.php)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
+[![Bootstrap v5.3.8](https://img.shields.io/badge/Bootstrap-v5.3.8-blueviolet.svg)](https://getbootstrap.com/)
+[![License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/webitproff/marketprofilter-cotonti/blob/main/LICENSE)
 
 <img src="https://raw.githubusercontent.com/webitproff/marketprofilter-cotonti/refs/heads/main/Market-PRO-product-filter-plugin-Cotonti-by-webitproff.webp" alt="Market PRO Filter plugin Cotonti CMF by webitproff">
 
