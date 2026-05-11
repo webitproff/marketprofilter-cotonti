@@ -5,6 +5,28 @@
  * Tags=market.list.tpl:{LIST_ROW_FILTER_PARAMS_HTML}
  * [END_COT_EXT]
  */
+
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: marketprofilter.market.list.loop.php
+ * Purpose: выводим значения и параметры в карточку товара в списках в шаблоне market.list.tpl
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
+
+
+ 
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_incfile('marketprofilter', 'plug');
@@ -12,7 +34,7 @@ require_once cot_incfile('marketprofilter', 'plug');
 global $L, $db, $db_x;
 
 $filter_params_html = '';
-
+$has_filter_params = false;  // Объявляем флаг наличия у товара в списке заполненных параметров фильтра
 if (!empty($item['fieldmrkt_id'])) {
 
     $db_params        = $db_x . 'marketprofilter_params';
@@ -57,6 +79,7 @@ if (!empty($item['fieldmrkt_id'])) {
             $formatted = marketprofilter_format_param_value($param_type, $values, $param_name);
 
             if ($formatted !== '') {
+			    $has_filter_params = true; // Устанавливаем флаг, если есть хотя бы один заполненный параметр
                 $filter_params_html .= '
                     <div class="row mb-1">
                         <div class="col-5 fw-bold">' . htmlspecialchars($title) . '</div>
@@ -70,3 +93,4 @@ if (!empty($item['fieldmrkt_id'])) {
 }
 
 $t->assign('LIST_ROW_FILTER_PARAMS_HTML', $filter_params_html);
+$t->assign('LIST_ROW_FILTER_PARAMS_EXIST', $has_filter_params);
