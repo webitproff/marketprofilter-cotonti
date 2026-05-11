@@ -5,21 +5,54 @@
  * Tags=market.edit.tpl:{MARKET_FORM_FILTER_PARAMS}
  * [END_COT_EXT]
  */
+
+
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: marketprofilter.market.edit.tags.php
+ * Purpose: выводим в шаблон market.edit.tpl формы для выбора значений, к которым принадлежит товар, что бы по ним срабатывал фильтр.
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
+ 
+
+/* 	
+	вот так в шаблоне market.edit.tpl
+ * <!-- IF {PHP|cot_plugin_active('marketprofilter')} -->
+ * <div class="col-12">
+ * 	<label class="form-label fw-semibold"></label>		
+ * 	{MARKET_FORM_FILTER_PARAMS}
+ * </div>
+ * <!-- ENDIF -->	
+ */		
+
+
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_incfile('forms');
 require_once cot_incfile('marketprofilter', 'plug');
 
-global $db, $db_x, $t, $item;
+global $db, $db_x;
 
-if (!$t || empty($item) || empty($item['fieldmrkt_cat'])) {
+if (!$t || empty($row_item)) {
     $t->assign('MARKET_FORM_FILTER_PARAMS', '');
     return;
 }
 
-$item_id = (int)$item['fieldmrkt_id'];
-$current_cat = $item['fieldmrkt_cat'];
-
+$item_id = (int)$row_item['fieldmrkt_id'];
+$current_cat = $row_item['fieldmrkt_cat'];
+ 
 $db_params = $db_x . 'marketprofilter_params';
 $db_values = $db_x . 'marketprofilter_params_values';
 
@@ -37,7 +70,7 @@ $params = $db->query("
     SELECT param_id, param_name, param_type, param_values
     FROM $db_params
     WHERE param_active = 1 AND (param_category = ? OR param_category = '')
-    ORDER BY param_id ASC
+    ORDER BY param_name ASC
 ", [$current_cat])->fetchAll();
 
 if (empty($params)) {
@@ -46,7 +79,7 @@ if (empty($params)) {
 }
 
 $filter_params_html = '<div class="border rounded p-4 mb-4 bg-light">';
-$filter_params_html .= '<h5 class="mb-3">Характеристики товара</h5>';
+$filter_params_html .= '<h5 class="mb-3">' . $L['marketprofilter_paramsItem'] . '</h5>';
 
 foreach ($params as $param) {
     $param_id   = (int)$param['param_id'];
