@@ -1,12 +1,25 @@
 <?php
 /**
  * Market PRO Filter Plugin: Core Functions
- * Полная мультиязычность + правильная архитектура
+ * Plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Полная мультиязычность + правильная (работоспособная) архитектура
+ * Filename: marketprofilter.functions.php
+ * Date=May 11Th, 2026
  *
- * @package Market PRO Filter
- * @copyright (c) webitproff
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
  * @license BSD
  */
+ 
+
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_langfile('marketprofilter', 'plug');
@@ -16,50 +29,190 @@ require_once cot_incfile('market', 'module');
 Cot::$db->registerTable('marketprofilter_params');
 Cot::$db->registerTable('marketprofilter_params_values');
 Cot::$db->registerTable('marketprofilter_i18n');
+
+// Языки, поддерживаемые плагином (те, для которых есть переводы в админке)
+$marketprofilter_supported_langs = ['ua', 'ru', 'en'];
+
+// Язык по умолчанию для фильтра (из настроек плагина или из конфига сайта)
+$marketprofilter_default_lang = Cot::$cfg['plugin']['marketprofilter']['marketprofilter_defaultlang'] 
+    ?? Cot::$cfg['defaultlang'] 
+    ?? 'ua';
+
 /**
- * Возвращает переведённый заголовок параметра
+ * Определяет язык для вывода фильтра:
+ * - если текущий язык пользователя есть среди поддерживаемых — используем его
+ * - иначе используем язык по умолчанию (ua)
+ */
+function marketprofilter_get_lang()
+{
+    global $marketprofilter_supported_langs, $marketprofilter_default_lang;
+    
+    $user_lang = Cot::$usr['lang'] ?? Cot::$cfg['defaultlang'] ?? 'ua';
+    if (strlen($user_lang) > 2) $user_lang = substr($user_lang, 0, 2);
+    
+    return in_array($user_lang, $marketprofilter_supported_langs) 
+        ? $user_lang 
+        : $marketprofilter_default_lang;
+}
+
+/**
+ * Проверяет, является ли текущий пользователь администратором (группа 5)
+ * Используется для фильтрации суперадминских параметров
+ */
+function marketprofilter_is_admin()
+{
+    global $db, $db_groups_users, $usr;
+    
+    static $is_admin = null;
+    if ($is_admin !== null) return $is_admin;
+    
+    if (!Cot::$usr['id']) {
+        $is_admin = false;
+    } else {
+        $sql = $db->query("SELECT 1 FROM $db_groups_users WHERE gru_userid = " . (int)Cot::$usr['id'] . " AND gru_groupid = 5 LIMIT 1");
+        $is_admin = $sql->fetchColumn() > 0;
+    }
+    return $is_admin;
+}
+
+
+/**
+ * Возвращает переведённый заголовок параметра.
+ * Если язык пользователя не поддерживается — используется дефолтный язык.
+ * Если перевода нет ни на одном языке — возвращается технический ключ.
+ * Пустые строки не возвращаются.
  */
 function marketprofilter_get_title($param_id, $lang = null)
 {
     global $db, $db_x;
-    if (!$lang) $lang = Cot::$cfg['defaultlang'] ?? 'ru';
-    if (strlen($lang) > 2) $lang = substr($lang, 0, 2);
+    // Если язык не передан — определяем через marketprofilter_get_lang()
+    // Эта функция уже вернёт либо язык пользователя (если он ua/ru/en), либо дефолтный
+    if (!$lang) $lang = marketprofilter_get_lang();
 
     static $cache = [];
     $cache_key = "$param_id|$lang";
+
+    // Проверяем кеш — если уже загружали для этого параметра и языка, возвращаем сразу
     if (isset($cache[$cache_key])) return $cache[$cache_key];
 
+    // Пытаемся получить перевод на текущем языке (язык пользователя или уже дефолтный)
     $sql = "SELECT i18n_title FROM {$db_x}marketprofilter_i18n 
             WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
-    $res = $db->query($sql, [$param_id, $lang])->fetchColumn();
-    $title = $res ?: "Param #$param_id";
+    $title = $db->query($sql, [$param_id, $lang])->fetchColumn();
 
-    $cache[$cache_key] = $title;
-    return $title;
+    // Если перевод найден и не пустой — кешируем и возвращаем
+    if (!empty($title)) {
+        $cache[$cache_key] = $title;
+        return $title;
+    }
+
+    // Если перевода нет — пробуем дефолтный язык
+    global $marketprofilter_default_lang;
+    if ($lang !== $marketprofilter_default_lang) {
+        $sql = "SELECT i18n_title FROM {$db_x}marketprofilter_i18n 
+                WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
+        $title = $db->query($sql, [$param_id, $marketprofilter_default_lang])->fetchColumn();
+
+        // Если нашли на дефолтном — кешируем и возвращаем
+        if (!empty($title)) {
+            $cache[$cache_key] = $title;
+            return $title;
+        }
+    }
+
+    // Если нет нигде — возвращаем технический ключ (НЕ пустую строку)
+    $cache[$cache_key] = "Param #$param_id";
+    return $cache[$cache_key];
 }
 
 /**
- * Возвращает переведённое значение по ключу
+ * Возвращает переведённое значение параметра по ключу.
+ * Если язык пользователя не поддерживается — используется дефолтный язык.
+ * Если перевода нет ни на одном языке — возвращается технический ключ.
+ * Пустые строки не возвращаются.
  */
 function marketprofilter_get_value($param_id, $key, $lang = null)
 {
     global $db, $db_x;
-    if (!$lang) $lang = Cot::$cfg['defaultlang'] ?? 'ru';
-    if (strlen($lang) > 2) $lang = substr($lang, 0, 2);
+    // Если язык не передан — определяем через marketprofilter_get_lang()
+    if (!$lang) $lang = marketprofilter_get_lang();
 
     static $cache = [];
     $cache_key = "$param_id|$lang";
+
+    // Загружаем все переводы для текущего языка, если ещё не загружены
     if (!isset($cache[$cache_key])) {
         $sql = "SELECT i18n_values FROM {$db_x}marketprofilter_i18n 
                 WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
         $json = $db->query($sql, [$param_id, $lang])->fetchColumn();
+        // Декодируем JSON в массив. Если нет данных — пустой массив
         $cache[$cache_key] = $json ? json_decode($json, true) : [];
     }
 
-    $translations = $cache[$cache_key];
-    return $translations[$key] ?? $key;
+    // Если перевод найден и не пустой — возвращаем
+    if (!empty($cache[$cache_key][$key])) {
+        return $cache[$cache_key][$key];
+    }
+
+    // Если перевода нет — пробуем дефолтный язык
+    global $marketprofilter_default_lang;
+    if ($lang !== $marketprofilter_default_lang) {
+        $default_cache_key = "$param_id|$marketprofilter_default_lang";
+        if (!isset($cache[$default_cache_key])) {
+            $sql = "SELECT i18n_values FROM {$db_x}marketprofilter_i18n 
+                    WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
+            $json = $db->query($sql, [$param_id, $marketprofilter_default_lang])->fetchColumn();
+            $cache[$default_cache_key] = $json ? json_decode($json, true) : [];
+        }
+
+        // Если нашли на дефолтном — возвращаем
+        if (!empty($cache[$default_cache_key][$key])) {
+            return $cache[$default_cache_key][$key];
+        }
+    }
+
+    // Если нет нигде — возвращаем технический ключ (НЕ пустую строку)
+    return $key;
 }
 
+/**
+ * Возвращает переведённую подсказку для параметра
+ */
+function marketprofilter_get_helpinfo($param_id, $lang = null)
+{
+    global $db, $db_x;
+    if (!$lang) $lang = marketprofilter_get_lang();
+    
+    static $cache = [];
+    $cache_key = "$param_id|$lang";
+    if (isset($cache[$cache_key])) return $cache[$cache_key];
+    
+    $sql = "SELECT i18n_helpinfo FROM {$db_x}marketprofilter_i18n 
+            WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
+    $help = $db->query($sql, [$param_id, $lang])->fetchColumn();
+    if (!empty($help)) {
+        $cache[$cache_key] = $help;
+        return $help;
+    }
+    
+    // fallback на дефолтный язык
+    global $marketprofilter_default_lang;
+    if ($lang !== $marketprofilter_default_lang) {
+        $sql = "SELECT i18n_helpinfo FROM {$db_x}marketprofilter_i18n 
+                WHERE i18n_param_id = ? AND i18n_locale = ? LIMIT 1";
+        $help = $db->query($sql, [$param_id, $marketprofilter_default_lang])->fetchColumn();
+        if (!empty($help)) {
+            $cache[$cache_key] = $help;
+            return $help;
+        }
+    }
+    
+    // иначе берём из основной таблицы
+    $sql = "SELECT param_helpinfo FROM {$db_x}marketprofilter_params WHERE param_id = ? LIMIT 1";
+    $help = $db->query($sql, [$param_id])->fetchColumn();
+    $cache[$cache_key] = $help ?: '';
+    return $cache[$cache_key];
+}
 /**
  * Форматирует значение параметра с учётом перевода
  * Добавлен параметр $lang для работы без авторизации
@@ -70,7 +223,8 @@ function marketprofilter_format_param_value($param_type, $values, $param_name = 
 
     // Определяем язык: сначала из параметра, потом из пользователя, потом из конфига
     if (!$lang) {
-        $lang = Cot::$usr['lang'] ?? (Cot::$cfg['lang'] ?? 'ru');
+        //$lang = Cot::$usr['lang'] ?? (Cot::$cfg['lang'] ?? 'ru');
+		$lang = marketprofilter_get_lang();
     }
     if (strlen($lang) > 2) $lang = substr($lang, 0, 2);
 
@@ -162,7 +316,21 @@ function marketprofilter_form_fields(array $values): string
     $html .= '<input type="checkbox" name="param_active" id="param_active" class="form-check-input" value="1"' . $checked . '>';
     $html .= '<label for="param_active" class="form-check-label">' . $L['marketprofilter_param_active'] . '</label>';
     $html .= '</div>';
+    // param_superadmin
+    $checked_superadmin = !empty($values['param_superadmin']) ? ' checked' : '';
+    $html .= '<div class="form-check mb-3">';
+    $html .= '<input type="checkbox" name="param_superadmin" id="param_superadmin" class="form-check-input" value="1"' . $checked_superadmin . '>';
+    $html .= '<label for="param_superadmin" class="form-check-label">' . $L['marketprofilter_param_superadmin'] . '</label>';
+    $html .= '<div class="form-text">' . $L['marketprofilter_param_superadmin_hint'] . '</div>';
+    $html .= '</div>';
 
+    // param_helpinfo
+    $help_value = htmlspecialchars($values['param_helpinfo'] ?? '');
+    $html .= '<div class="mb-3">';
+    $html .= '<label for="param_helpinfo" class="form-label">' . $L['marketprofilter_param_helpinfo'] . '</label>';
+    $html .= '<textarea name="param_helpinfo" id="param_helpinfo" class="form-control" rows="2">' . $help_value . '</textarea>';
+    $html .= '<div class="form-text">' . $L['marketprofilter_param_helpinfo_hint'] . '</div>';
+    $html .= '</div>';
     return $html;
 }
 
@@ -288,6 +456,203 @@ function marketprofilter_log($message, $file = 'marketprofilter.log')
     @file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
 }
 
+/**
+ * Возвращает путь к директории кеша плагина, создаёт при необходимости
+ * @return string Путь к директории
+ */
+function marketprofilter_cache_dir() {
+    global $cfg;                                                // получаем основной конфиг Cotonti
+    $dir = $cfg['cache_dir'] . '/marketprofilter';             // директория внутри системного кеша
+    if (!is_dir($dir)) {                                       // если такой директории нет
+        mkdir($dir, 0755, true);                               // создаём рекурсивно с правами
+    }
+    return $dir;                                               // возвращаем путь
+}
+
+/**
+ * Читает данные из файлового кеша
+ * @param string $key  Уникальный ключ
+ * @param int    $ttl  Время жизни в секундах (по умолчанию 300)
+ * @return mixed|null  Данные или null, если кеш отсутствует/просрочен
+ */
+function marketprofilter_cache_get($key, $ttl = 300) {
+    $file = marketprofilter_cache_dir() . '/' . md5($key) . '.cache'; // полный путь к файлу кеша на основе хеша ключа
+    if (file_exists($file) && (filemtime($file) + $ttl) > time()) {   // если файл есть и не просрочен
+        return json_decode(file_get_contents($file), true);            // читаем JSON и раскодируем в массив
+    }
+    return null;                                             // иначе возвращаем null (кеш недействителен)
+}
+
+/**
+ * Сохраняет данные в файловый кеш
+ * @param string $key   Уникальный ключ
+ * @param mixed  $data  Данные для сохранения (сериализуется в JSON)
+ */
+function marketprofilter_cache_set($key, $data) {
+    $file = marketprofilter_cache_dir() . '/' . md5($key) . '.cache'; // формируем имя файла
+    file_put_contents($file, json_encode($data), LOCK_EX);            // атомарно пишем JSON в файл
+}
+
+/**
+ * Полностью очищает файловый кеш плагина
+ */
+function marketprofilter_cache_clear() {
+    $dir = marketprofilter_cache_dir();                      // получаем директорию кеша
+    $files = glob($dir . '/*.cache');                        // ищем все .cache файлы в ней
+    foreach ($files as $file) {                              // обходим каждый
+        unlink($file);                                       // удаляем
+    }
+}
+
+/**
+ * Зависимый (фасетный) подсчёт количества товаров для каждого значения параметра
+ * с учётом других активных фильтров и выбранных значений самого параметра.
+ * Использует файловый кеш.
+ *
+ * @param int    $param_id     ID параметра
+ * @param string $current_cat  Код категории (или '' если без)
+ * @return array  Ассоциативный массив [значение => количество товаров]
+ */
+function marketprofilter_get_faceted_counts($param_id, $current_cat = '') {
+    global $db, $db_x;                                           // объекты БД
+
+    // --- Кеш ---
+    $get_sorted = $_GET;                                         // берём все GET-параметры
+    ksort($get_sorted);                                          // сортируем для одинакового ключа при любом порядке
+    $cache_key = "faceted|$param_id|$current_cat|" . http_build_query($get_sorted); // уникальный строковый ключ
+    $cached = marketprofilter_cache_get($cache_key, 300);        // пробуем прочитать кеш (TTL 5 минут)
+    if ($cached !== null) {                                      // если кеш есть и свеж
+        return $cached;                                          // сразу возвращаем его
+    }
+    // --- конец кеша ---
+
+    $table_params = $db_x . 'marketprofilter_params';            // имя таблицы параметров
+    $table_values = $db_x . 'marketprofilter_params_values';     // имя таблицы значений
+    $table_market = $db_x . 'market';                            // имя таблицы товаров
+
+    $param = $db->query("SELECT param_type, param_name, param_values FROM $table_params WHERE param_id = ?", [$param_id])->fetch(); // получаем текущий параметр
+    if (!$param) return [];                                      // если не найден — пустой массив
+    $values_raw = json_decode($param['param_values'], true);     // декодируем JSON-список значений
+    if (!is_array($values_raw)) return [];                       // если не массив — выход
+    $param_type = $param['param_type'];                          // тип параметра (select/checkbox/radio/range)
+    $param_name = $param['param_name'];                          // системное имя параметра
+
+    // Собираем уже выбранные значения этого же параметра (для учёта внутри одной группы)
+    $self_selected = [];                                         // здесь будут значения, применённые к текущему параметру
+    $self_key = "filter_{$param_name}";                          // имя GET-параметра для текущего фильтра
+    if (isset($_GET[$self_key]) && $_GET[$self_key] !== '') {    // если фильтр этого параметра задан
+        $self_val = $_GET[$self_key];                            // получаем значение
+        if ($param_type === 'checkbox') {                        // для чекбоксов это может быть массив
+            $self_selected = is_array($self_val) ? array_filter($self_val) : [$self_val]; // превращаем в массив и чистим
+        } elseif ($param_type === 'radio' || $param_type === 'select') { // для одиночного выбора
+            $self_selected = [trim($self_val)];                  // берём одно значение
+        }
+        $self_selected = array_values($self_selected);           // переиндексируем массив
+    }
+/* 
+	// FIX для 'range' - пока не применяли! Посмотрим как себя поведет текущий код выше.
+	if (isset($_GET[$self_key]) && $_GET[$self_key] !== '') {
+		if ($param_type !== 'range') {   // <-- исключаем range
+			$self_val = $_GET[$self_key];
+			if ($param_type === 'checkbox') {
+				$self_selected = is_array($self_val) ? array_filter($self_val) : [$self_val];
+			} elseif ($param_type === 'radio' || $param_type === 'select') {
+				$self_selected = [trim($self_val)];
+			}
+			$self_selected = array_values($self_selected);
+		}
+	}
+	 есть одна критическая ошибка в функции marketprofilter_get_faceted_counts — неправильная обработка параметра типа range при сборе self_selected.
+
+	Сейчас для range, если задан фильтр, значение попадает в else (после проверок на checkbox и radio/select) и создаётся $self_selected = [trim($self_val)]. Это неверно, потому что:
+
+		Значение диапазона хранится как "min-max", а в GET приходит, например, "80" или "40-80". Точное совпадение с таким значением через EXISTS не сработает или будет некорректным.
+
+		Для range не нужен учёт выбранного значения внутри того же параметра — логика фасетного подсчёта для диапазона не предполагает перекрёстного влияния опций (в отличие от чекбоксов или селектов).
+
+	Исправление:
+	Добавить проверку на range перед сбором self_selected, чтобы для диапазона он оставался пустым.
+	Это гарантирует, что для range массив $self_selected останется пустым и не будет добавлено лишнее условие EXISTS.
+	// FIX для 'range' - пока не применяли! Посмотрим как себя поведет текущий код.
+ */
+ 
+ 
+    // Остальные активные фильтры (кроме текущего)
+    $all_params = $db->query("SELECT param_id, param_name, param_type FROM $table_params WHERE param_active = 1")->fetchAll(); // все активные параметры
+    $active_filters = [];                                        // контейнер для реально использованных фильтров
+    foreach ($all_params as $p) {                                // перебираем каждый параметр
+        if ($p['param_id'] == $param_id) continue;               // текущий параметр пропускаем
+        $key = "filter_{$p['param_name']}";                      // ключ в $_GET
+        $val = $_GET[$key] ?? null;                              // безопасно читаем (null если нет)
+        if ($val === null || $val === '') continue;              // нет или пусто — не фильтруем
+        if ($p['param_type'] === 'checkbox') {                   // если тип — чекбокс
+            if (!is_array($val)) $val = [$val];                  // делаем массив
+            $val = array_filter($val);                           // убираем пустые
+            if (!$val) continue;                                 // если после очистки ничего — пропускаем
+        } elseif ($p['param_type'] === 'range') {                // если диапазон
+            $val = trim($val);                                   // обрезаем пробелы
+            if ($val === '') continue;                           // пусто — мимо
+        } else {                                                 // select или radio
+            $val = trim($val);                                   // обрезаем
+            if ($val === '') continue;                           // пусто — мимо
+        }
+        $active_filters[] = ['param_id' => $p['param_id'], 'type' => $p['param_type'], 'value' => $val]; // сохраняем активный фильтр
+    }
+
+    // Строим JOIN и WHERE для других фильтров
+    $joins = '';                                                 // строка с JOIN'ами
+    $where = [];                                                 // массив условий WHERE
+    $i = 0;                                                      // счётчик для алиасов таблиц
+    if ($current_cat !== '') {                                   // если задана категория
+        $where[] = "m.fieldmrkt_cat = " . $db->quote($current_cat); // добавляем условие по категории
+    }
+    foreach ($active_filters as $f) {                            // обходим все активные посторонние фильтры
+        $alias = "fpf_$i";                                       // уникальный алиас таблицы
+        $joins .= " INNER JOIN $table_values AS $alias ON $alias.fieldmrkt_id = m.fieldmrkt_id AND $alias.param_id = {$f['param_id']}"; // соединяем с таблицей значений
+        $i++;                                                     // увеличиваем счётчик алиасов
+        if ($f['type'] === 'range') {                             // фильтр-диапазон
+            if (strpos($f['value'], '-') !== false) {             // если есть дефис — разбираем min-max
+                [$min, $max] = array_map('floatval', explode('-', $f['value']));
+            } else {                                              // иначе только верхняя граница
+                $min = 0;
+                $max = floatval($f['value']);
+            }
+            if ($max > 0) {                                       // если верхняя граница положительная
+                $where[] = "CAST(SUBSTRING_INDEX($alias.param_value, '-', 1) AS DECIMAL(12,2)) >= $min AND CAST(SUBSTRING_INDEX($alias.param_value, '-', -1) AS DECIMAL(12,2)) <= $max";
+            }                                                      // добавляем условие попадания в диапазон
+        } elseif ($f['type'] === 'checkbox') {                    // чекбокс
+            $esc = implode(',', array_map([$db, 'quote'], (array)$f['value'])); // экранируем и объединяем выбранные значения
+            $where[] = "$alias.param_value IN ($esc)";            // условие IN
+        } else {                                                  // select/radio
+            $where[] = "$alias.param_value = " . $db->quote($f['value']); // точное совпадение
+        }
+    }
+
+    // Учёт выбранных значений текущего параметра (внутри группы)
+    if (!empty($self_selected)) {                                 // если в текущем параметре что‑то выбрано
+        $esc_self = implode(',', array_map([$db, 'quote'], $self_selected)); // экранируем
+        $where[] = "EXISTS (SELECT 1 FROM $table_values sv WHERE sv.fieldmrkt_id = v.fieldmrkt_id AND sv.param_id = $param_id AND sv.param_value IN ($esc_self))"; // товар должен иметь хотя бы одно из этих значений
+    }
+
+    $vals_esc = implode(',', array_map([$db, 'quote'], $values_raw)); // все значения текущего параметра для IN
+    $sql = "SELECT v.param_value, COUNT(DISTINCT v.fieldmrkt_id) AS cnt
+            FROM $table_values v
+            INNER JOIN $table_market m ON m.fieldmrkt_id = v.fieldmrkt_id
+            $joins
+            WHERE v.param_id = $param_id AND v.param_value IN ($vals_esc)"
+            . ($where ? ' AND ' . implode(' AND ', $where) : '')  // добавляем условия фильтров
+            . " GROUP BY v.param_value";                          // группируем по значению параметра
+
+    $res = $db->query($sql)->fetchAll(PDO::FETCH_KEY_PAIR);       // выполняем, получаем [значение => кол-во]
+    $counts = [];                                                 // итоговый массив
+    foreach ($values_raw as $v) {                                 // проходим по всем возможным значениям
+        $counts[$v] = (int)($res[$v] ?? 0);                      // если нет — пишем 0
+    }
+
+    // Сохраняем в файловый кеш
+    marketprofilter_cache_set($cache_key, $counts);               // записываем свежий результат
+    return $counts;                                               // возвращаем массив
+}
 
 
 
