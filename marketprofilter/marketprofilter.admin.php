@@ -6,14 +6,21 @@ Hooks=tools
 ==================== */
 
 /**
- * Market PRO Filter plugin for CMF Cotonti Siena v.0.9.26, PHP v.8.4+, MySQL v.8.0+
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
  * Filename: marketprofilter.admin.php
  * Purpose: создание и редактирование групп характеристик, а также значений для фильтра товаров.
- * Date=2025-12-14
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
  * @package marketprofilter
- * @version 2.2.1
+ * @version 3.3.36
  * @author webitproff
- * @copyright Copyright (c) webitproff 2025 https://github.com/webitproff/
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
  * @license BSD
  */
 defined('COT_CODE') or die('Wrong URL');
@@ -34,9 +41,9 @@ $db_i18n   = $db_x . 'marketprofilter_i18n';
 
 $action   = cot_import('a', 'G', 'ALP');
 $param_id = cot_import('id', 'G', 'INT');
-
-$main_lang   = Cot::$cfg['defaultlang'] ?? 'ru';
-$extra_langs = ['en', 'ua'];
+list($pg, $d, $durl) = cot_import_pagenav('d', Cot::$cfg['maxrowsperpage']); //добавил пагинацию. Cot::$cfg['maxrowsperpage'] по умолчанию равно 15
+$main_lang   = Cot::$cfg['defaultlang'] ?? 'ua';
+$extra_langs = ['en', 'ru'];
 
 $all_langs   = array_unique(array_merge([$main_lang], $extra_langs));
 
@@ -70,24 +77,28 @@ if ($action === 'edit' && $param_id > 0) {
     }
 } else {
     $form_values = [
-        'param_id'       => '',
-        'param_name'     => '',
-        'param_type'     => 'select',
-        'param_values'   => '[]',
-        'param_category' => '',
-        'param_active'   => 1,
+        'param_id'         => '',
+        'param_name'       => '',
+        'param_type'       => 'select',
+        'param_values'     => '[]',
+        'param_category'   => '',
+        'param_active'     => 1,
+        'param_superadmin' => 0,      
+        'param_helpinfo'   => '',     
     ];
 }
 
 // === СОХРАНЕНИЕ ===
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit'])) {
     $data = [
-        'param_name'     => cot_import('param_name', 'P', 'ALP'),
-		'param_title'    => cot_import('param_title', 'P', 'TXT'), // 
-        'param_type'     => cot_import('param_type', 'P', 'ALP'),
-        'param_values'   => cot_import('param_values', 'P', 'TXT'),
-        'param_category' => cot_import('param_category', 'P', 'ALP') ?: '',
-        'param_active'   => cot_import('param_active', 'P', 'BOL') ? 1 : 0,
+        'param_name'       => cot_import('param_name', 'P', 'ALP'),
+        'param_title'      => cot_import('param_title', 'P', 'TXT'),
+        'param_type'       => cot_import('param_type', 'P', 'ALP'),
+        'param_values'     => cot_import('param_values', 'P', 'TXT'),
+        'param_category'   => cot_import('param_category', 'P', 'ALP') ?: '',
+        'param_active'     => cot_import('param_active', 'P', 'BOL') ? 1 : 0,
+        'param_superadmin' => cot_import('param_superadmin', 'P', 'BOL') ? 1 : 0,   
+        'param_helpinfo'   => cot_import('param_helpinfo', 'P', 'TXT'),             
     ];
 
     if (!$data['param_name'] || !in_array($data['param_type'], ['range','select','checkbox','radio'])) {
@@ -113,12 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($action, ['add', 'edit']))
             foreach ($all_langs  as $lang) {
                 $title  = cot_import("i18n_title_$lang", 'P', 'TXT');
                 $values = cot_import("i18n_values_$lang", 'P', 'TXT');
+                $helpinfo = cot_import("i18n_helpinfo_$lang", 'P', 'TXT');   
                 if ($title !== '') {
                     $db->insert($db_i18n, [
                         'i18n_param_id' => $param_id,
                         'i18n_locale'   => $lang,
                         'i18n_title'    => $title,
-                        'i18n_values'   => $values ?: null
+                        'i18n_values'   => $values ?: null,
+                        'i18n_helpinfo' => $helpinfo,                         
                     ]);
                 }
             }
@@ -142,7 +155,7 @@ $form_fields = marketprofilter_form_fields($form_values);
 // === МУЛЬТИЯЗЫЧНОСТЬ ===
 if ($edit_mode) {
     $i18n = [];
-    $res = $db->query("SELECT i18n_locale, i18n_title, i18n_values FROM $db_i18n WHERE i18n_param_id = ?", [$param_id]);
+    $res = $db->query("SELECT i18n_locale, i18n_title, i18n_values, i18n_helpinfo FROM $db_i18n WHERE i18n_param_id = ?", [$param_id]);
     while ($row = $res->fetch()) {
         $i18n[$row['i18n_locale']] = $row;
     }
@@ -155,6 +168,7 @@ $form_fields .= '<hr><h5>' . $L['marketprofilter_translations'] . '</h5>';
 foreach ($all_langs as $lang) {
     $title  = $i18n[$lang]['i18n_title'] ?? '';
     $values = $i18n[$lang]['i18n_values'] ?? '';
+    $helpinfo = $i18n[$lang]['i18n_helpinfo'] ?? '';   // подсказка по параметру
 
     $form_fields .= '<div class="mb-3">';
     $form_fields .= '  <label class="form-label">' . $L['marketprofilter_param_title'] . ' (' . strtoupper($lang) . ')</label>';
@@ -168,11 +182,18 @@ foreach ($all_langs as $lang) {
         $form_fields .= '  <small class="text-muted">' . $L['marketprofilter_i18n_values_hint'] . '</small>';
         $form_fields .= '</div>';
     }
+
+    // поле для перевода подсказки
+    $form_fields .= '<div class="mb-3">';
+    $form_fields .= '  <label class="form-label">' . $L['marketprofilter_param_helpinfo'] . ' (' . strtoupper($lang) . ')</label>';
+    $form_fields .= '  <textarea name="i18n_helpinfo_' . $lang . '" class="form-control" rows="2">' . htmlspecialchars($helpinfo) . '</textarea>';
+    $form_fields .= '</div>';
 }
 
 // === СПИСОК ===
+$total_params = $db->query("SELECT COUNT(*) FROM $db_params")->fetchColumn();
 $lang_alias = 'i_' . $main_lang;
-$lang_literal = $db->quote($main_lang);  // правильно экранирует и добавляет кавычки
+$lang_literal = $db->quote($main_lang);
 
 $parameters = $db->query("
     SELECT p.*, COALESCE({$lang_alias}.i18n_title, p.param_name) AS display_title
@@ -181,7 +202,9 @@ $parameters = $db->query("
         ON {$lang_alias}.i18n_param_id = p.param_id 
         AND {$lang_alias}.i18n_locale = {$lang_literal}
     ORDER BY p.param_id DESC
-")->fetchAll();
+    LIMIT $d, " . Cot::$cfg['maxrowsperpage']
+)->fetchAll();
+
 
 // === ВЫВОД ===
 $t->assign([
@@ -200,12 +223,26 @@ foreach ($parameters as $param) {
         'PARAM_VALUES'   => '<code>' . htmlspecialchars($param['param_values']) . '</code>',
         'PARAM_CATEGORY' => $param['param_category'] ?: '—',
         'PARAM_ACTIVE'   => $param['param_active'] ? $L['Yes'] : $L['No'],
+		'PARAM_SUPERADMIN' => $param['param_superadmin'] ? $L['Yes'] : '',
+		'PARAM_HELPINFO_SHORT' => htmlspecialchars(mb_substr($param['param_helpinfo'] ?? '', 0, 50)),
         'PARAM_EDIT_URL' => cot_url('admin', "m=other&p=marketprofilter&a=edit&id={$param['param_id']}"),
         'PARAM_DELETE_URL' => cot_confirm_url(cot_url('admin', "m=other&p=marketprofilter&a=delete&id={$param['param_id']}")),
     ]);
     $t->parse('MAIN.PARAM_ROW');
 }
 
+$pagenav = cot_pagenav(
+    'admin',
+    'm=other&p=marketprofilter',
+    $d,
+    $total_params,
+    Cot::$cfg['maxrowsperpage'],
+    'd',
+    '',
+    Cot::$cfg['jquery'] && Cot::$cfg['turnajax']
+);
+
+$t->assign(cot_generatePaginationTags($pagenav));
 cot_display_messages($t);
 
 if ($edit_mode) {
