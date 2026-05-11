@@ -4,7 +4,30 @@
  * Hooks=market.list.query
  * [END_COT_EXT]
  */
-// marketprofilter.market.list.query.php
+ 
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: marketprofilter.market.list.query.php
+ * Purpose: Изменяет SQL-запросы списка товаров через хук market.list.query:
+ *          — добавляет фильтры в URL пагинации (filter_*),
+ *          — дополняет запросы JOIN и WHERE для выбранных значений параметров,
+ *          — формирует итоговые $sql_item_count и $sql_item_string с учётом фильтров,
+ *          — подсчитывает количество отфильтрованных товаров для информационного сообщения.
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
+
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_incfile('marketprofilter', 'plug');
@@ -31,16 +54,24 @@ $cat_cond = $current_cat !== ''
     ? "(param_category = " . $db->quote($current_cat) . " OR param_category = '')" 
     : "param_category = ''";
 
-$filter_params = $db->query("
-    SELECT param_id, param_name, param_type
+$filter_params_all = $db->query("
+    SELECT param_id, param_name, param_type, param_superadmin
     FROM $db_params
     WHERE param_active = 1 AND $cat_cond
     ORDER BY param_id ASC
 ")->fetchAll();
 
+// Отфильтровываем суперадминские параметры для не-админов
+$filter_params = [];
+foreach ($filter_params_all as $p) {
+    if (!marketprofilter_is_admin() && $p['param_superadmin'] == 1) {
+        continue;
+    }
+    $filter_params[] = $p;
+}
+
 if (empty($filter_params)) {
     marketprofilter_log("No active params");
-    // Важно: очищаем сообщение, если параметров нет
     $L['marketprofilter_message'] = '';
     $L['marketprofilter_message_class'] = '';
     return;
@@ -96,8 +127,6 @@ foreach ($filter_params as $param) {
     $filter_index++;
 }
 
-// КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: выполняем только если есть активные фильтры
-// И делаем это ТОЛЬКО ОДИН РАЗ, чтобы не перезаписывать много раз
 if ($filter_index > 0) {
     $join_condition .= $additional_joins;
 
@@ -122,35 +151,21 @@ if ($filter_index > 0) {
                         ORDER BY $orderby
                         LIMIT $d, $maxItemRowsPerPage";
 
-    // Считаем ТОЛЬКО ОДИН РАЗ!
+    // Один раз считаем количество отфильтрованных товаров
     $total_filtered = (int)$db->query($sql_item_count)->fetchColumn();
 
+    if ($total_filtered > 0) {
+        $L['marketprofilter_message'] = str_replace('{COUNT}', $total_filtered, $L['marketprofilter_found_items']);
+        $L['marketprofilter_message_class'] = 'alert-success';
+    } else {
+        $L['marketprofilter_message'] = $L['marketprofilter_no_items'];
+        $L['marketprofilter_message_class'] = 'alert-warning';
+    }
 
-/* if ($total_filtered > 0) {
-    $L['marketprofilter_message'] = "Найдено $total_filtered позиций";
-    $L['marketprofilter_message_class'] = 'alert-success';
-} else {
-    $L['marketprofilter_message'] = "Товаров не найдено";
-    $L['marketprofilter_message_class'] = 'alert-warning';
-} */
-$total_filtered = (int)$db->query($sql_item_count)->fetchColumn();
-
-if ($total_filtered > 0) {
-    $L['marketprofilter_message'] = str_replace('{COUNT}', $total_filtered, $L['marketprofilter_found_items']);
-    $L['marketprofilter_message_class'] = 'alert-success';
-} else {
-    $L['marketprofilter_message'] = $L['marketprofilter_no_items'];
-    $L['marketprofilter_message_class'] = 'alert-warning';
-}
-
-marketprofilter_log("Applied filters. Found: $total_filtered");
-
-
-
-
+    marketprofilter_log("Applied filters. Found: $total_filtered");
 
 } else {
-    // Если фильтров нет — просто очищаем сообщение (чтобы не дублировалось)
+    // Если фильтров нет — очищаем сообщение
     $L['marketprofilter_message'] = '';
     $L['marketprofilter_message_class'] = '';
 }
