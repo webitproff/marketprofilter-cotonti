@@ -6,12 +6,21 @@
  */
 defined('COT_CODE') or die('Wrong URL');
 
-/* global $list_url_path;
-
-// Сохраняем все filter_* параметры в URL пагинации
-foreach ($_GET as $key => $value) {
-    if (strpos($key, 'filter_') === 0 && $value !== '' && $value !== null) {
-        // Если значение массив (checkbox) — Cotonti сам сериализует в URL как filter_name[]=val1&filter_name[]=val2
-        $list_url_path[$key] = $value;
-    }
-} */
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: marketprofilter.market.list.main.php
+ * Purpose: пока пусто (заготовка: вешаем то, что до иницализации шаблона)
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
