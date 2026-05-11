@@ -5,6 +5,32 @@
  * Tags=market.tpl:{MARKET_FILTER_PARAMS}
  * [END_COT_EXT]
  */
+ 
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: marketprofilter.market.tags.php
+ * Purpose: Добавляет в шаблон карточки товара (market.tpl) блок {MARKET_FILTER_PARAMS}
+ *          со списком параметров фильтра, присвоенных данному товару.
+ *          Для каждого параметра выводится локализованное название и отформатированное значение
+ *          (с учётом типа: select, checkbox, range, radio) на языке пользователя.
+ *          Также передаются подсказки (helpinfo) и техническое имя параметра.
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
+
+
+
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_incfile('marketprofilter', 'plug');
@@ -32,12 +58,22 @@ $db_values = $db_x . 'marketprofilter_params_values';
 $current_lang = Cot::$usr['lang'] ?: (Cot::$cfg['lang'] ?? 'ru');
 
 // Получаем активные параметры
-$params = $db->query("
-    SELECT param_id, param_name, param_type
+$params_all = $db->query("
+    SELECT param_id, param_name, param_type, param_superadmin
     FROM $db_params
     WHERE param_active = 1
-    ORDER BY param_id ASC
+    ORDER BY param_name ASC
 ")->fetchAll();
+
+$params = [];
+foreach ($params_all as $p) {
+    if (!marketprofilter_is_admin() && $p['param_superadmin'] == 1) {
+        continue;
+    }
+    $params[] = $p;
+}
+
+
 
 marketprofilter_log("Найдено активных параметров: " . count($params));
 
@@ -67,7 +103,7 @@ foreach ($params as $param) {
 
     // Переведённый заголовок
     $title = marketprofilter_get_title($param_id, $current_lang);
-
+	$helpinfo = marketprofilter_get_helpinfo($param_id, $current_lang);
     // Значения товара
     $saved_values = $saved_all[$param_id] ?? [];
 
@@ -77,10 +113,13 @@ foreach ($params as $param) {
     marketprofilter_log("Параметр $param_name ($param_type): $formatted_value");
 
     if ($formatted_value !== '') {
-        $t->assign([
-            'PARAM_TITLE' => htmlspecialchars($title),
-            'PARAM_VALUE' => htmlspecialchars($formatted_value)
-        ]);
+		$t->assign([
+			'PARAM_TITLE' => htmlspecialchars($title),
+			'PARAM_VALUE' => htmlspecialchars($formatted_value),
+			//'PARAM_HELP'  => htmlspecialchars($helpinfo),
+			'PARAM_HELP'  => $helpinfo,   // без экранирования, чтобы HTML работал
+			'PARAM_NAME'  => htmlspecialchars($param_name)
+		]);
         $t->parse('MAIN.MARKET_FILTER_PARAMS');
     }
 }
