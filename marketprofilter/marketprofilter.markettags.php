@@ -5,17 +5,32 @@
  * Tags=market.list.tpl:{MARKET_FILTER_FORM}
  * [END_COT_EXT]
  */
+ 
 /**
- * Market PRO Filter plugin for CMF Cotonti Siena v.0.9.26, PHP v.8.4+, MySQL v.8.0+
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
  * Filename: marketprofilter.markettags.php
- * Purpose: 
- * Date=2025-12-14
+ * Purpose: Формирует и передаёт в шаблон market.list.tpl блок {MARKET_FILTER_FORM} 
+ *          с формой фильтрации товаров по параметрам.
+ *          Для каждого активного параметра (range/select/checkbox/radio) строятся
+ *          элементы формы, подгружаются актуальные количества товаров с учётом
+ *          уже выбранных фильтров (фасетный подсчёт) и формируются URL‑ы формы и сброса.
+ *          и сообщения с результатами {MARKETFILTER_MESSAGE}
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
  * @package marketprofilter
- * @version 2.2.1
+ * @version 3.3.36
  * @author webitproff
- * @copyright Copyright (c) webitproff 2025 https://github.com/webitproff/
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
  * @license BSD
  */
+
+
 
 defined('COT_CODE') or die('Wrong URL');
 
@@ -28,9 +43,18 @@ if (!$t) return;
 $db_params = $db_x . 'marketprofilter_params';
 $db_i18n   = $db_x . 'marketprofilter_i18n';
 
-$t1 = new XTemplate(cot_tplfile(['marketprofilter', 'filterform'], 'plug'));
-
 $current_cat = (isset($c) && is_string($c)) ? trim($c) : '';
+
+// Шаблон фильтра: если для категории есть свой файл — используем его
+$template_name = ['marketprofilter', 'filterform']; // дефолтный
+if (!empty($current_cat)) {
+    $custom_tpl = $current_cat; // structure_code
+    $custom_path = ['marketprofilter', 'filterform', $custom_tpl];
+    if (file_exists(cot_tplfile($custom_path, 'plug', true))) {
+        $template_name = $custom_path;
+    }
+}
+$t1 = new XTemplate(cot_tplfile($template_name, 'plug'));
 
 $where_sql = $current_cat !== ''
     ? "(param_category = ? OR param_category = '')"
@@ -38,12 +62,21 @@ $where_sql = $current_cat !== ''
 
 $bind = $current_cat !== '' ? [$current_cat] : [];
 
+/* ==== фильтр и сортировка списка параметров в форме */
+
+// Если не админ – исключаем суперадминские параметры
+$superadmin_cond = '';
+if (!marketprofilter_is_admin()) {
+    $superadmin_cond = " AND param_superadmin = 0";
+}
+
 $filter_params = $db->query("
-    SELECT param_id, param_name, param_type, param_values, param_category
+    SELECT param_id, param_name, param_type, param_values, param_category, param_helpinfo
     FROM $db_params
-    WHERE param_active = 1 AND $where_sql
-    ORDER BY param_id ASC
+    WHERE param_active = 1 AND $where_sql $superadmin_cond
+    ORDER BY param_name ASC
 ", $bind)->fetchAll();
+
 
 if (empty($filter_params)) {
     $t->assign([
@@ -66,12 +99,23 @@ foreach ($filter_params as $param) {
     $input = cot_import("filter_$param_name", 'G', $param_type === 'checkbox' ? 'ARR' : 'TXT');
 
     $title = marketprofilter_get_title($param_id, Cot::$usr['lang'] ?? 'ru');
-
+	$helpinfo = marketprofilter_get_helpinfo($param_id, Cot::$usr['lang'] ?? 'ru');
     $t1->assign([
         'FILTER_PARAM_NAME'  => htmlspecialchars($param_name),
         'FILTER_PARAM_TITLE' => htmlspecialchars($title),
         'FILTER_PARAM_TYPE'  => $param_type,
+		//'FILTER_PARAM_HELP'  => htmlspecialchars($helpinfo),   // подсказка
+		'FILTER_PARAM_HELP'  => $helpinfo,
     ]);
+	
+/* //'FILTER_PARAM_HELP'  => htmlspecialchars($helpinfo),   // подсказка
+'FILTER_PARAM_HELP'  => $helpinfo,
+Текст сохранится в БД как HTML, 
+а на сайте будет выводиться с HTML-тегами благодаря убранному htmlspecialchars().
+Важно: это безопасно, так как доступ к редактированию параметров есть только у администраторов сайта. 
+Обычные пользователи не могут вставлять HTML. 
+*/
+
 
     if ($param_type === 'range') {
         $value = $input ? floatval($input) : 0;
@@ -84,8 +128,10 @@ foreach ($filter_params as $param) {
 
     } else {
         $list_block = strtoupper($param_type) . '_LIST';
-
-        // Подсчёт количества — теперь безопасно
+		// Подсчёт количества, обновляемый после применения параметров фильтра
+		$counts = marketprofilter_get_faceted_counts($param_id, $current_cat);
+		/* 
+        // Подсчёт количества. Старый метдо до появления функции marketprofilter_get_faceted_counts
         $counts = [];
         if (!empty($values_raw)) {
             $vals_esc = implode(',', array_map([$db, 'quote'], $values_raw));
@@ -103,7 +149,8 @@ foreach ($filter_params as $param) {
             foreach ($values_raw as $v) {
                 $counts[$v] = $res[$v] ?? 0;
             }
-        }
+        } 
+		*/
 
         foreach ($values_raw as $key) {
             $display_text = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? 'ru');
