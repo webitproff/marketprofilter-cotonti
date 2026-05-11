@@ -4,7 +4,27 @@
 Hooks=market.edit.update.done
 [END_COT_EXT]
 ==================== */
-// файл marketprofilter.market.edit.update.done.php
+
+
+/**
+ * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
+ * Filename: файл marketprofilter.market.edit.update.done.php
+ * Purpose: подключаемся к редактированию товара и обновляем его
+ * Date=May 11Th, 2026
+ *
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
+ *
+ * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
+ * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
+ *
+ * @package marketprofilter
+ * @version 3.3.36
+ * @author webitproff
+ * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
+ * @license BSD
+ */
+ 
 defined('COT_CODE') or die('Wrong URL');
 
 require_once cot_incfile('market', 'module');
@@ -78,52 +98,26 @@ if ($fieldmrkt_id > 0 && isset($_POST['marketprofilter']) && is_array($_POST['ma
                 marketprofilter_log("Неверный диапазон для $param_name: min=$min max=$max");
             }
         } 
-elseif ($param_type === 'checkbox') {
-    if (is_array($param_value)) {
-        $valid_values = json_decode($param_values_raw, true);
-        if (!is_array($valid_values)) $valid_values = [];
+		elseif ($param_type === 'checkbox') {
+			if (is_array($param_value)) {
+				$valid_values = json_decode($param_values_raw, true);
+				if (!is_array($valid_values)) $valid_values = [];
 
-        $flat_values = flatten_checkbox_values($param_value);
-        $filtered_values = array_filter($flat_values, fn($v) => is_scalar($v) && in_array($v, $valid_values));
+				$flat_values = flatten_checkbox_values($param_value);
+				$filtered_values = array_filter($flat_values, fn($v) => is_scalar($v) && in_array($v, $valid_values));
 
-        foreach ($filtered_values as $value) {
-            $db->insert($db_marketprofilter_params_values, [
-                'fieldmrkt_id' => $fieldmrkt_id,
-                'param_id' => $param_id,
-                'param_value' => (string)$value
-            ], true); // true = ON DUPLICATE KEY UPDATE
-            marketprofilter_log("Сохранён checkbox $param_name: $value");
-        }
-    } else {
-        marketprofilter_log("Ожидался массив для checkbox $param_name");
-    }
-}
-
-
-		
-		/* elseif ($param_type === 'checkbox') {
-            if (is_array($param_value)) {
-                $valid_values = json_decode($param_values_raw, true);
-                if (!is_array($valid_values)) {
-                    $valid_values = [];
-                }
-                $flat_values = flatten_checkbox_values($param_value);
-                foreach ($flat_values as $value) {
-                    if (is_scalar($value) && in_array($value, $valid_values)) {
-                        $db->insert($db_marketprofilter_params_values, [
-                            'fieldmrkt_id' => $fieldmrkt_id,
-                            'param_id' => $param_id,
-                            'param_value' => (string)$value
-                        ]);
-                        marketprofilter_log("Сохранён checkbox $param_name: $value");
-                    } else {
-                        marketprofilter_log("Пропущен checkbox $param_name: $value");
-                    }
-                }
-            } else {
-                marketprofilter_log("Ожидался массив для checkbox $param_name");
-            }
-        } */ elseif ($param_type === 'select') {
+				foreach ($filtered_values as $value) {
+					$db->insert($db_marketprofilter_params_values, [
+						'fieldmrkt_id' => $fieldmrkt_id,
+						'param_id' => $param_id,
+						'param_value' => (string)$value
+					], true); // true = ON DUPLICATE KEY UPDATE
+					marketprofilter_log("Сохранён checkbox $param_name: $value");
+				}
+			} else {
+				marketprofilter_log("Ожидался массив для checkbox $param_name");
+			}
+		} elseif ($param_type === 'select') {
             if (is_scalar($param_value) && !empty($param_value)) {
                 $valid_values = json_decode($param_values_raw, true);
                 if (!is_array($valid_values)) {
@@ -168,5 +162,9 @@ elseif ($param_type === 'checkbox') {
 } else {
     marketprofilter_log('fieldmrkt_id <= 0 или marketprofilter не передан');
 }
-?>
+// Очищаем кеш фасетных подсчётов после изменения параметров товара
+if (function_exists('marketprofilter_cache_clear')) {
+    marketprofilter_cache_clear();
+}
+
 
