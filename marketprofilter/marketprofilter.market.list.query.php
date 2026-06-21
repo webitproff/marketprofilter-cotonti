@@ -104,8 +104,7 @@ foreach ($filter_params as $param) {
         }
         if ($max <= 0) continue;
 
-        $additional_where[] = "CAST(SUBSTRING_INDEX($alias.param_value, '-', 1) AS DECIMAL(12,2)) >= $min 
-                               AND CAST(SUBSTRING_INDEX($alias.param_value, '-', -1) AS DECIMAL(12,2)) <= $max";
+        $additional_where[] = "CAST($alias.param_value AS UNSIGNED) >= $min AND CAST($alias.param_value AS UNSIGNED) <= $max";
         marketprofilter_log("Range: $param_name $min-$max");
 
     } elseif ($param_type === 'checkbox') {

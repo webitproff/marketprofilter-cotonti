@@ -82,7 +82,21 @@ if ($fieldmrkt_id > 0 && isset($_POST['marketprofilter']) && is_array($_POST['ma
 
         $param_value = $_POST['marketprofilter'][$param_name];
         marketprofilter_log("Обработка $param_name ($param_type) = " . print_r($param_value, true));
-
+		if ($param_type === 'range') {
+			// Ожидаем одно число (ключ 'value')
+			$single = isset($param_value['value']) ? trim($param_value['value']) : '';
+			if ($single !== '' && is_numeric($single)) {
+				$db->insert($db_marketprofilter_params_values, [
+					'fieldmrkt_id' => $fieldmrkt_id,
+					'param_id' => $param_id,
+					'param_value' => (int)$single
+				]);
+				marketprofilter_log("Сохранён range $param_name: $single");
+			} else {
+				marketprofilter_log("Неверное число для $param_name: $single");
+			}
+		}
+/* 
         if ($param_type === 'range') {
             $min = isset($param_value['min']) && $param_value['min'] !== '' ? (int)$param_value['min'] : null;
             $max = isset($param_value['max']) && $param_value['max'] !== '' ? (int)$param_value['max'] : null;
@@ -98,6 +112,8 @@ if ($fieldmrkt_id > 0 && isset($_POST['marketprofilter']) && is_array($_POST['ma
                 marketprofilter_log("Неверный диапазон для $param_name: min=$min max=$max");
             }
         } 
+		
+		 */
 		elseif ($param_type === 'checkbox') {
 			if (is_array($param_value)) {
 				$valid_values = json_decode($param_values_raw, true);

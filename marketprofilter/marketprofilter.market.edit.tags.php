@@ -78,9 +78,10 @@ if (empty($params)) {
     return;
 }
 
-$filter_params_html = '<div class="border rounded p-4 mb-4 bg-light">';
-$filter_params_html .= '<h5 class="mb-3">' . $L['marketprofilter_paramsItem'] . '</h5>';
-
+// Передаём заголовок блока (можно использовать в шаблоне)
+$t->assign('FILTER_PARAMS_HEADER', $L['marketprofilter_paramsItem'] ?? 'Параметры фильтра');
+//$t->assign('MARKET_FORM_FILTER_PARAMS', '');
+// Основной цикл по параметрам – теперь без HTML-строк
 foreach ($params as $param) {
     $param_id   = (int)$param['param_id'];
     $param_name = $param['param_name'];
@@ -90,39 +91,27 @@ foreach ($params as $param) {
     if (!is_array($values_raw)) continue;
 
     // Переведённый заголовок
-    $title = marketprofilter_get_title($param_id, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
-
+    $title    = marketprofilter_get_title($param_id, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
+    $helpinfo = marketprofilter_get_helpinfo($param_id, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
     $saved_values = $saved_all[$param_id] ?? [];
 
+    // Формируем HTML элемента ввода (только для вставки в шаблон)
     $input = '';
-
     switch ($param_type) {
         case 'range':
-            $min_val = $max_val = '';
-            if (!empty($saved_values[0]) && strpos($saved_values[0], '-') !== false) {
-                [$min_val, $max_val] = explode('-', $saved_values[0], 2);
-                $min_val = $min_val === '' ? '' : (int)$min_val;
-                $max_val = $max_val === '' ? '' : (int)$max_val;
+            $saved = $saved_values[0] ?? '';
+            if (strpos($saved, '-') !== false) {
+                [, $maxTmp] = explode('-', $saved);
+                $saved = $maxTmp;
             }
-            $min_ph = $values_raw['min'] ?? '';
-            $max_ph = $values_raw['max'] ?? '';
-            $input = '
-                <div class="row g-2">
-                    <div class="col">
-                        <input type="number" name="marketprofilter['.$param_name.'][min]" value="'.$min_val.'" class="form-control" placeholder="от '.$min_ph.'">
-                    </div>
-                    <div class="col">
-                        <input type="number" name="marketprofilter['.$param_name.'][max]" value="'.$max_val.'" class="form-control" placeholder="до '.$max_ph.'">
-                    </div>
-                </div>';
+            $input = '<input type="number" name="marketprofilter['.$param_name.'][value]" value="'.htmlspecialchars($saved).'" class="form-control" placeholder="Введите число">';
             break;
 
         case 'select':
             $selected = $saved_values[0] ?? '';
             $options = [];
             foreach ($values_raw as $key) {
-                $translated = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
-                $options[$key] = $translated;
+                $options[$key] = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
             }
             $input = cot_selectbox($selected, "marketprofilter[$param_name]", array_keys($options), array_values($options), true, ['class' => 'form-select']);
             break;
@@ -131,8 +120,7 @@ foreach ($params as $param) {
             $checked = is_array($saved_values) ? $saved_values : [];
             $options = [];
             foreach ($values_raw as $key) {
-                $translated = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
-                $options[$key] = $translated;
+                $options[$key] = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
             }
             $input = cot_checklistbox($checked, "marketprofilter[$param_name][]", array_keys($options), array_values($options), ['class' => 'form-check-input']);
             break;
@@ -141,8 +129,7 @@ foreach ($params as $param) {
             $selected = $saved_values[0] ?? '';
             $options = [];
             foreach ($values_raw as $key) {
-                $translated = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
-                $options[$key] = $translated;
+                $options[$key] = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? Cot::$cfg['lang'] ?? 'ru');
             }
             $input = cot_radiobox($selected, "marketprofilter[$param_name]", array_keys($options), array_values($options), ['class' => 'form-check-input']);
             break;
@@ -152,13 +139,17 @@ foreach ($params as $param) {
             $input = '<input type="text" name="marketprofilter['.$param_name.']" value="'.htmlspecialchars($value).'" class="form-control">';
     }
 
-    $filter_params_html .= '
-        <div class="mb-3">
-            <label class="form-label fw-bold">'.$title.'</label>
-            '.$input.'
-        </div>';
+    // Передаём данные в шаблон для одного параметра
+    $t->assign([
+        'FILTER_PARAM_TITLE'   => htmlspecialchars($title),
+        'FILTER_PARAM_NAME'    => htmlspecialchars($param_name),
+        'FILTER_PARAM_INPUT'   => $input,
+        'FILTER_PARAM_HELP'    => $helpinfo,
+        'FILTER_PARAM_HASHELP' => !empty($helpinfo) ? 1 : 0,
+    ]);
+
+    // Парсим дочерний блок MARKET_FORM_FILTER_PARAM (будет определён в market.edit.tpl) -- все дальше где-то не так написано
+    $t->parse('MAIN.MARKET_FORM_FILTER_PARAMS.MARKET_FORM_FILTER_PARAM');
+	
 }
-
-$filter_params_html .= '</div>';
-
-$t->assign('MARKET_FORM_FILTER_PARAMS', $filter_params_html);
+$t->parse('MAIN.MARKET_FORM_FILTER_PARAMS');

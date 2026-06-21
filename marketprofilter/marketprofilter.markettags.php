@@ -5,19 +5,19 @@
  * Tags=market.list.tpl:{MARKET_FILTER_FORM}
  * [END_COT_EXT]
  */
- 
+
 /**
  * Market PRO Filter plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
  * Filename: marketprofilter.markettags.php
- * Purpose: Формирует и передаёт в шаблон market.list.tpl блок {MARKET_FILTER_FORM} 
+ * Purpose: Формирует и передаёт в шаблон market.list.tpl блок {MARKET_FILTER_FORM}
  *          с формой фильтрации товаров по параметрам.
  *          Для каждого активного параметра (range/select/checkbox/radio) строятся
  *          элементы формы, подгружаются актуальные количества товаров с учётом
  *          уже выбранных фильтров (фасетный подсчёт) и формируются URL‑ы формы и сброса.
  *          и сообщения с результатами {MARKETFILTER_MESSAGE}
- * Date=May 11Th, 2026
+ * Date=May 17Th, 2026
  *
- * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
+ * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter
  * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
  *
  * Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
@@ -29,8 +29,6 @@
  * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
  * @license BSD
  */
-
-
 
 defined('COT_CODE') or die('Wrong URL');
 
@@ -71,12 +69,11 @@ if (!marketprofilter_is_admin()) {
 }
 
 $filter_params = $db->query("
-    SELECT param_id, param_name, param_type, param_values, param_category, param_helpinfo
+    SELECT param_id, param_name, param_type, param_values, param_category, param_helpinfo, param_hidelistitem
     FROM $db_params
     WHERE param_active = 1 AND $where_sql $superadmin_cond
     ORDER BY param_name ASC
 ", $bind)->fetchAll();
-
 
 if (empty($filter_params)) {
     $t->assign([
@@ -87,11 +84,51 @@ if (empty($filter_params)) {
     return;
 }
 
+// === УНИВЕРСАЛЬНАЯ ГЕНЕРАЦИЯ ТЕГОВ ДЛЯ ВСЕХ АКТИВНЫХ ПАРАМЕТРОВ (БЕЗ УЧЁТА КАТЕГОРИИ) ===
+$all_params = $db->query("
+    SELECT param_name, param_values
+    FROM $db_params
+    WHERE param_active = 1
+")->fetchAll();
+
+foreach ($all_params as $p) {
+    $pname = $p['param_name'];
+    $pvals = json_decode($p['param_values'], true);
+    if (!is_array($pvals)) continue;
+    
+    $t->assign('PARAM_' . strtoupper($pname) . '_EXISTS', 1);
+    
+    foreach ($pvals as $val) {
+        $safe_val = preg_replace('/[^a-zA-Z0-9_]/', '_', $val);
+        $tag = 'PARAM_' . strtoupper($pname) . '_VALUE_' . strtoupper($safe_val) . '_EXISTS';
+        $t->assign($tag, 1);
+    }
+}
+// === КОНЕЦ БЛОКА ===
+
+/* // Генерация универсальных тегов для всех параметров и значений
+foreach ($filter_params as $param) {
+    $param_name = $param['param_name'];
+    $values_raw = json_decode($param['param_values'], true);
+    if (!is_array($values_raw)) continue;
+
+    // Тег: существует ли такой параметр (всегда 1, т.к. мы выбрали только активные)
+    $t->assign('PARAM_' . strtoupper($param_name) . '_EXISTS', 1);
+
+    // Для каждого значения из JSON создаём тег вида PARAM_ИМЯ_VALUE_ЗНАЧЕНИЕ_EXISTS
+    foreach ($values_raw as $val) {
+        // Очищаем значение для безопасного использования в имени тега
+        $safe_val = preg_replace('/[^a-zA-Z0-9_]/', '_', $val);
+        $tag_name = 'PARAM_' . strtoupper($param_name) . '_VALUE_' . strtoupper($safe_val) . '_EXISTS';
+        $t->assign($tag_name, 1);
+    }
+} */
 foreach ($filter_params as $param) {
     $param_id       = (int)$param['param_id'];
     $param_name     = $param['param_name'];
     $param_type     = $param['param_type'];
-    $param_category = $param['param_category'] ?? ''; // <-- ИСПРАВЛЕНО
+    $param_category = $param['param_category'] ?? '';
+    $param_hidelist = !empty($param['param_hidelistitem']) ? 1 : 0;
     $values_raw     = json_decode($param['param_values'], true);
 
     if (!is_array($values_raw)) continue;
@@ -99,85 +136,136 @@ foreach ($filter_params as $param) {
     $input = cot_import("filter_$param_name", 'G', $param_type === 'checkbox' ? 'ARR' : 'TXT');
 
     $title = marketprofilter_get_title($param_id, Cot::$usr['lang'] ?? 'ru');
-	$helpinfo = marketprofilter_get_helpinfo($param_id, Cot::$usr['lang'] ?? 'ru');
-    $t1->assign([
-        'FILTER_PARAM_NAME'  => htmlspecialchars($param_name),
-        'FILTER_PARAM_TITLE' => htmlspecialchars($title),
-        'FILTER_PARAM_TYPE'  => $param_type,
-		//'FILTER_PARAM_HELP'  => htmlspecialchars($helpinfo),   // подсказка
-		'FILTER_PARAM_HELP'  => $helpinfo,
-    ]);
-	
-/* //'FILTER_PARAM_HELP'  => htmlspecialchars($helpinfo),   // подсказка
-'FILTER_PARAM_HELP'  => $helpinfo,
-Текст сохранится в БД как HTML, 
-а на сайте будет выводиться с HTML-тегами благодаря убранному htmlspecialchars().
-Важно: это безопасно, так как доступ к редактированию параметров есть только у администраторов сайта. 
-Обычные пользователи не могут вставлять HTML. 
-*/
+    $helpinfo = marketprofilter_get_helpinfo($param_id, Cot::$usr['lang'] ?? 'ru');
+    $is_color = (strpos($param_name, 'color_') === 0);
 
+    $t1->assign([
+        'FILTER_PARAM_NAME'     => htmlspecialchars($param_name),
+        'FILTER_PARAM_TITLE'    => htmlspecialchars($title),
+        'FILTER_PARAM_TYPE'     => $param_type,
+        'FILTER_PARAM_HELP'     => $helpinfo,
+        'FILTER_PARAM_IS_COLOR' => $is_color,
+        'FILTER_PARAM_HIDELIST' => $param_hidelist,
+    ]);
+
+    // Карта цветов для параметра "color"
+    $color_map = [];
+    if ($is_color) {
+        $color_map = [
+            'white'  => '#f7f7f7',
+            'black'  => '#000000',
+            'gray'   => '#bababa',
+            'red'    => '#ff0000',
+            'blue'   => '#344fd0',
+            'green'  => '#008000',
+            'lime'   => '#32cd32',
+            'yellow' => '#eeee12',
+            'orange' => '#ff8c00',
+            'pink'   => '#ff69b4',
+            'purple' => '#800080',
+            'brown'  => '#8b4513',
+            'cyan'   => '#00ffff',
+            'teal'   => '#008080',
+            'indigo' => '#4b0082',
+            'maroon' => '#800000',
+            'navy'   => '#000080',
+            'olive'  => '#808000',
+        ];
+    }
 
     if ($param_type === 'range') {
-        $value = $input ? floatval($input) : 0;
+        $range_min = $values_raw['min'] ?? 0;
+        $range_max = $values_raw['max'] ?? 100000;
+        $filter_active = false;
+        $min_selected = $range_min;
+        $max_selected = $range_max;
+        if ($input && is_string($input) && strpos($input, '-') !== false) {
+            [$min_selected, $max_selected] = array_map('floatval', explode('-', $input));
+            $filter_active = true;
+        }
+        $current_range_value = $filter_active ? ($min_selected . '-' . $max_selected) : '';
+        $range_count = $filter_active
+            ? marketprofilter_get_range_count($param_id, $min_selected, $max_selected, $current_cat)
+            : 0;
+
         $t1->assign([
-            'FILTER_PARAM_VALUE_MAX' => $value,
-            'FILTER_PARAM_MIN'       => $values_raw['min'] ?? 0,
-            'FILTER_PARAM_MAX'       => $values_raw['max'] ?? 10000,
+            'FILTER_PARAM_MIN'          => $range_min,
+            'FILTER_PARAM_MAX'          => $range_max,
+            'FILTER_PARAM_VALUE_MIN'    => $min_selected,
+            'FILTER_PARAM_VALUE_MAX'    => $max_selected,
+            'FILTER_PARAM_HIDDEN_VALUE' => $current_range_value,
+            'FILTER_PARAM_OPTION_COUNT' => $range_count,
         ]);
         $t1->parse('FILTER_FORM.FILTER_PARAM.RANGE');
-
     } else {
-        $list_block = strtoupper($param_type) . '_LIST';
-		// Подсчёт количества, обновляемый после применения параметров фильтра
-		$counts = marketprofilter_get_faceted_counts($param_id, $current_cat);
-		/* 
-        // Подсчёт количества. Старый метдо до появления функции marketprofilter_get_faceted_counts
-        $counts = [];
-        if (!empty($values_raw)) {
-            $vals_esc = implode(',', array_map([$db, 'quote'], $values_raw));
-            $cat_cond = ($param_category === '' && $current_cat !== '')
-                ? "AND m.fieldmrkt_cat = " . $db->quote($current_cat)
-                : '';
-
-            $sql = "SELECT v.param_value, COUNT(DISTINCT v.fieldmrkt_id) AS cnt
-                    FROM {$db_x}marketprofilter_params_values v
-                    INNER JOIN {$db_x}market m ON m.fieldmrkt_id = v.fieldmrkt_id
-                    WHERE v.param_id = $param_id AND v.param_value IN ($vals_esc) $cat_cond
-                    GROUP BY v.param_value";
-
-            $res = $db->query($sql)->fetchAll(PDO::FETCH_KEY_PAIR);
-            foreach ($values_raw as $v) {
-                $counts[$v] = $res[$v] ?? 0;
-            }
-        } 
-		*/
+        // Генерация HTML списка опций для select/checkbox/radio
+        $counts = marketprofilter_get_faceted_counts($param_id, $current_cat);
+        $list_html = '';
 
         foreach ($values_raw as $key) {
             $display_text = marketprofilter_get_value($param_id, $key, Cot::$usr['lang'] ?? 'ru');
-
             $is_selected = $input && (
                 $param_type === 'checkbox'
                     ? in_array($key, (array)$input, true)
                     : ((string)$key === (string)$input)
             );
+            $color = $is_color ? ($color_map[$key] ?? '') : '';
+            $checked_attr = ($is_selected && in_array($param_type, ['checkbox','radio'])) ? 'checked' : '';
+            $selected_attr = ($param_type === 'select' && $is_selected) ? 'selected' : '';
+            $count = $counts[$key] ?? 0;
+            $count_badge = $count > 0 ? '<span class="badge rounded-pill text-bg-warning me-1">' . (int)$count . '</span>' : '';
 
-            $t1->assign([
-                'FILTER_PARAM_OPTION_VALUE'    => htmlspecialchars($key),
-                'FILTER_PARAM_OPTION_TEXT'     => htmlspecialchars($display_text),
-                'FILTER_PARAM_OPTION_SELECTED' => ($param_type === 'select' && $is_selected) ? 'selected' : '',
-                'FILTER_PARAM_CHECKED'         => ($is_selected && in_array($param_type, ['checkbox','radio'])) ? 'checked' : '',
-                'FILTER_PARAM_OPTION_COUNT'    => $counts[$key] ?? 0,
-            ]);
-            $t1->parse("FILTER_FORM.FILTER_PARAM.$list_block");
+            switch (true) {
+                case ($param_type === 'select'):
+                    $list_html .= '<option value="' . htmlspecialchars($key) . '" ' . $selected_attr . '>'
+                        . htmlspecialchars($display_text) . ' (' . (int)$count . ')</option>';
+                    break;
+
+                case ($is_color && $param_type === 'checkbox'):
+                    $list_html .= '<div class="position-relative">'
+                        . '<label class="filter-color-i">'
+                        . '<input type="checkbox" name="filter_' . htmlspecialchars($param_name) . '[]" value="' . htmlspecialchars($key) . '" ' . $checked_attr . ' style="display:none;">'
+                        . '<i class="filter-color-b" style="background-color: ' . htmlspecialchars($color) . ';" title="' . htmlspecialchars($display_text) . '" data-bs-toggle="tooltip"></i>';
+                    if ($count > 0) {
+                        $list_html .= '<div class="position-absolute top-0 end-0"><span class="badge rounded-pill text-bg-warning ms-1">' . (int)$count . '</span></div>';
+                    }
+                    $list_html .= '</label></div>';
+                    break;
+
+                case ($is_color && $param_type === 'radio'):
+                    $list_html .= '<div class="position-relative">'
+                        . '<label class="filter-color-i">'
+                        . '<input type="radio" name="filter_' . htmlspecialchars($param_name) . '" value="' . htmlspecialchars($key) . '" ' . $checked_attr . ' style="display:none;">'
+                        . '<i class="filter-color-b" style="background-color: ' . htmlspecialchars($color) . ';" title="' . htmlspecialchars($display_text) . '" data-bs-toggle="tooltip"></i>';
+                    if ($count > 0) {
+                        $list_html .= '<div class="position-absolute top-0 end-0"><span class="badge rounded-pill text-bg-warning ms-1">' . (int)$count . '</span></div>';
+                    }
+                    $list_html .= '</label></div>';
+                    break;
+
+                case ($param_type === 'checkbox'):
+                    $list_html .= '<div class="form-check">'
+                        . '<input type="checkbox" name="filter_' . htmlspecialchars($param_name) . '[]" value="' . htmlspecialchars($key) . '" class="form-check-input" ' . $checked_attr . '>'
+                        . '<label class="form-check-label">' . $count_badge . htmlspecialchars($display_text) . '</label>'
+                        . '</div>';
+                    break;
+
+                case ($param_type === 'radio'):
+                    $list_html .= '<div class="form-check">'
+                        . '<input type="radio" name="filter_' . htmlspecialchars($param_name) . '" value="' . htmlspecialchars($key) . '" class="form-check-input" ' . $checked_attr . '>'
+                        . '<label class="form-check-label">' . htmlspecialchars($display_text) . ' (' . (int)$count . ')</label>'
+                        . '</div>';
+                    break;
+            }
         }
-        $t1->parse("FILTER_FORM.FILTER_PARAM." . strtoupper($param_type));
+
+        $t1->assign('FILTER_PARAM_LIST_HTML', $list_html);
+        $t1->parse('FILTER_FORM.FILTER_PARAM.' . strtoupper($param_type));
     }
 
     $t1->parse('FILTER_FORM.FILTER_PARAM');
 }
 
-//$search_url = cot_url('market', $current_cat !== '' ? ['c' => $current_cat] : []);
-//$reset_url  = cot_url('market', $current_cat !== '' ? ['c' => $current_cat] : []);
 // Базовые параметры (категория)
 $base_params = $current_cat !== '' ? ['c' => $current_cat] : [];
 

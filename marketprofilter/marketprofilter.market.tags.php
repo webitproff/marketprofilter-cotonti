@@ -115,7 +115,10 @@ foreach ($params as $param) {
     if ($formatted_value !== '') {
 		$t->assign([
 			'PARAM_TITLE' => htmlspecialchars($title),
-			'PARAM_VALUE' => htmlspecialchars($formatted_value),
+			//'PARAM_VALUE' => htmlspecialchars($formatted_value),
+			'PARAM_VALUE' => ($param_type === 'checkbox')
+				? $formatted_value                     // HTML-список, уже содержит экранированные значения
+				: htmlspecialchars($formatted_value),
 			//'PARAM_HELP'  => htmlspecialchars($helpinfo),
 			'PARAM_HELP'  => $helpinfo,   // без экранирования, чтобы HTML работал
 			'PARAM_NAME'  => htmlspecialchars($param_name)

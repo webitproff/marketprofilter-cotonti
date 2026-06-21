@@ -4,8 +4,8 @@
 Code=marketprofilter
 Name=Market PRO Filter
 Description=Dynamic filter parameters for Market PRO module
-Version=3.3.36
-Date=May 11Th, 2026
+Version=3.3.38
+Date=June 21Th, 2026
 Author=webitproff
 Copyright=(c) webitproff <a href="https://github.com/webitproff?tab=repositories" target="_blank" rel="noopener noreferrer"><strong>See on GitHub</strong></a>
 Notes=
