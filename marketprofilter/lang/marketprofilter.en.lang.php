@@ -76,13 +76,25 @@ $L['marketprofilter_error_values_format'] = 'Values must be an array: ["value1",
 $L['marketprofilter_param_added'] = 'Parameter added successfully';
 $L['marketprofilter_param_updated'] = 'Parameter updated successfully';
 $L['marketprofilter_param_deleted'] = 'Parameter deleted';
-
+$L['marketprofilter_Hide_Filter'] = 'Hide Filter';
+$L['marketprofilter_Show_Filter'] = 'Show Filter';
+// ==== admin tpl ===
+$L['marketprofilter_tab_list'] = 'Список';
+$L['marketprofilter_tab_add']  = 'Добавить';
+$L['marketprofilter_tab_edit'] = 'Редактировать';
+$L['marketprofilter_filter']   = 'Фильтр';
+$L['marketprofilter_all_categories'] = 'Все категории';
+$L['marketprofilter_uncategorized']  = 'Без категории';
+// ==== admin tpl ===
 $L['marketprofilter_param_superadmin'] = 'Admin only';
 $L['marketprofilter_param_superadmin_hint'] = 'If checked, this parameter will be visible and available for filtering only to users with administrator rights (group 5).';
 $L['marketprofilter_param_helpinfo'] = 'Hint / Explanation';
 $L['marketprofilter_param_helpinfo_hint'] = 'A short explanatory text that will be shown next to the parameter in the filter form.';
 $L['marketprofilter_param_superadmin_short'] = '🔒 Admin';
 $L['marketprofilter_param_helpinfo_short'] = 'Hint';
+$L['marketprofilter_foldall'] = 'foldall';
+$L['marketprofilter_unfoldall'] = 'unfold';
+$L['marketprofilter_select_param_value_not_selected'] = 'Not selected';
 
 // ADMIN PANEL. STRINGS FOR MULTILINGUAL SUPPORT
 $L['marketprofilter_i18n_title_ru'] = 'Parameter name (RU)';
@@ -123,7 +135,7 @@ $L['marketprofilter_adminHelp'] = 'Detailed guide to filling in filter parameter
 // FRONTEND. Public site part
 $L['marketprofilter_found_items'] = 'Found {COUNT} items';
 $L['marketprofilter_no_items'] = 'No items found matching the specified parameters';
-$L['marketprofilter_market_paramsItem_desc'] = 'and its characteristics, parameter names and values in the product filter on the site category';
+$L['marketprofilter_market_paramsItem_desc'] = 'and its characteristics, parameter names and values in the product filter, for searching on the site within its main category.';
 $L['marketprofilter_market_list_help'] = '<strong>Strict match filter for parameter combinations.</strong>
 <ul>
 <li><strong>Do not select too many parameters at once.</strong></li>
