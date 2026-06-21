@@ -1,7 +1,7 @@
 -- marketprofilter.install.sql
 -- Market PRO Filter + Полная мультиязычность (ru/en/ua)
 -- Cotonti CMF v.1+ | PHP ≥8.4 | MySQL ≥8.0
--- Date=May 11Th, 2026
+-- Date=June 21Th, 2026
 -- Plugin Market PRO Filter (Source code):  https://github.com/webitproff/marketprofilter-cotonti
 -- version 3.3.36
 
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `cot_marketprofilter_params` (
     `param_active` TINYINT(1) DEFAULT 1,
     `param_superadmin` TINYINT(1) NOT NULL DEFAULT 0,
     `param_helpinfo` TEXT NULL,  
+	`param_hidelistitem` TINYINT(1) NOT NULL DEFAULT 0,
     PRIMARY KEY (`param_id`),
     UNIQUE KEY `param_name` (`param_name`),
     KEY `param_category` (`param_category`)
@@ -84,3 +85,25 @@ INSERT INTO `cot_marketprofilter_i18n` (`i18n_param_id`, `i18n_locale`, `i18n_ti
 (15, 'ua', 'Тип амортизації', '{"no_suspension": "Без амортизації", "dual_suspension": "Подвійна амортизація", "rear_suspension": "Задня амортизація", "front_suspension": "Передня амортизація", "dual_reinforced_suspension": "Подвійна підвіска посилена"}'),
 (15, 'en', 'Suspension Type', '{"no_suspension": "No Suspension", "dual_suspension": "Dual Suspension", "rear_suspension": "Rear Suspension", "front_suspension": "Front Suspension", "dual_reinforced_suspension": "Dual Reinforced Suspension"}'),
 (15, 'ru', 'Тип амортизации', '{"no_suspension": "Без амортизации", "dual_suspension": "Двойная амортизация", "rear_suspension": "Задняя амортизация", "front_suspension": "Передняя амортизация", "dual_reinforced_suspension": "Двойная подвеска усиленная"}');
+
+-- Пример параметра типа range (цена, грн)
+INSERT INTO `cot_marketprofilter_params` (`param_id`, `param_name`, `param_title`, `param_type`, `param_values`, `param_category`, `param_active`) VALUES
+(32, '000_05_price', 'Ціна, грн', 'range', '{"min":100,"max":120000}', '', 1);
+
+-- Параметры цвета (radio и checkbox)
+INSERT INTO `cot_marketprofilter_params` (`param_id`, `param_name`, `param_title`, `param_type`, `param_values`, `param_category`, `param_active`) VALUES
+(33, 'color_radio', 'Колір (один)', 'radio', '["white","black","gray","red","blue","green","lime","yellow","orange","pink","purple","brown","cyan","teal","indigo","maroon","navy","olive"]', '', 1),
+(34, 'color_checkbox', 'Кольори (декілька)', 'checkbox', '["white","black","gray","red","blue","green","lime","yellow","orange","pink","purple","brown","cyan","teal","indigo","maroon","navy","olive"]', '', 1);
+
+-- Переводы для color_radio
+INSERT INTO `cot_marketprofilter_i18n` (`i18n_param_id`, `i18n_locale`, `i18n_title`, `i18n_values`) VALUES
+(33, 'ua', 'Колір (один)', '{"white":"Білий","black":"Чорний","gray":"Сірий","red":"Червоний","blue":"Синій","green":"Зелений","lime":"Лайм (салатовий)","yellow":"Жовтий","orange":"Помаранчевий","pink":"Рожевий","purple":"Фіолетовий","brown":"Коричневий","cyan":"Блакитний (ціан)","teal":"Бірюзовий","indigo":"Індиго","maroon":"Темно-бордовий","navy":"Темно-синій","olive":"Оливковий"}'),
+(33, 'en', 'Color (single)', '{"white":"White","black":"Black","gray":"Gray","red":"Red","blue":"Blue","green":"Green","lime":"Lime","yellow":"Yellow","orange":"Orange","pink":"Pink","purple":"Purple","brown":"Brown","cyan":"Cyan","teal":"Teal","indigo":"Indigo","maroon":"Maroon","navy":"Navy","olive":"Olive"}'),
+(33, 'ru', 'Цвет (один)', '{"white":"Белый","black":"Чёрный","gray":"Серый","red":"Красный","blue":"Синий","green":"Зелёный","lime":"Лайм (салатовый)","yellow":"Жёлтый","orange":"Оранжевый","pink":"Розовый","purple":"Фиолетовый","brown":"Коричневый","cyan":"Голубой (циан)","teal":"Бирюзовый","indigo":"Индиго","maroon":"Тёмно-бордовый","navy":"Тёмно-синий","olive":"Оливковый"}');
+
+-- Переводы для color_checkbox
+INSERT INTO `cot_marketprofilter_i18n` (`i18n_param_id`, `i18n_locale`, `i18n_title`, `i18n_values`) VALUES
+(34, 'ua', 'Кольори (декілька)', '{"white":"Білий","black":"Чорний","gray":"Сірий","red":"Червоний","blue":"Синій","green":"Зелений","lime":"Лайм (салатовий)","yellow":"Жовтий","orange":"Помаранчевий","pink":"Рожевий","purple":"Фіолетовий","brown":"Коричневий","cyan":"Блакитний (ціан)","teal":"Бірюзовий","indigo":"Індиго","maroon":"Темно-бордовий","navy":"Темно-синій","olive":"Оливковий"}'),
+(34, 'en', 'Colors (multi)', '{"white":"White","black":"Black","gray":"Gray","red":"Red","blue":"Blue","green":"Green","lime":"Lime","yellow":"Yellow","orange":"Orange","pink":"Pink","purple":"Purple","brown":"Brown","cyan":"Cyan","teal":"Teal","indigo":"Indigo","maroon":"Maroon","navy":"Navy","olive":"Olive"}'),
+(34, 'ru', 'Цвета (несколько)', '{"white":"Белый","black":"Чёрный","gray":"Серый","red":"Красный","blue":"Синий","green":"Зелёный","lime":"Лайм (салатовый)","yellow":"Жёлтый","orange":"Оранжевый","pink":"Розовый","purple":"Фиолетовый","brown":"Коричневый","cyan":"Голубой (циан)","teal":"Бирюзовый","indigo":"Индиго","maroon":"Тёмно-бордовый","navy":"Тёмно-синий","olive":"Оливковый"}');
+
