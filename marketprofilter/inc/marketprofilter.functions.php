@@ -4,7 +4,7 @@
  * Plugin for CMF Cotonti v.1+, PHP v.8.4+, MySQL v.8.0+
  * Полная мультиязычность + правильная (работоспособная) архитектура
  * Filename: marketprofilter.functions.php
- * Date=May 11Th, 2026
+ * Date=June 21Th, 2026
  *
  * ReadMeMore:              https://abuyfile.com/market/cotonti/plugs/market-pro-filter 
  * Support:                 https://abuyfile.com/forums/cotonti/custom/plugs/marketprofilter
@@ -13,7 +13,7 @@
  * Module Market PRO (Source code):         https://github.com/webitproff/marketpro-cotonti
  *
  * @package marketprofilter
- * @version 3.3.36
+ * @version 3.3.38
  * @author webitproff
  * @copyright Copyright (c) webitproff 2026 https://github.com/webitproff/
  * @license BSD
@@ -228,22 +228,62 @@ function marketprofilter_format_param_value($param_type, $values, $param_name = 
     }
     if (strlen($lang) > 2) $lang = substr($lang, 0, 2);
 
-    if ($param_type === 'range') {
+/*     if ($param_type === 'range') {
         if (!empty($values[0]) && strpos($values[0], '-') !== false) {
             [$min, $max] = explode('-', $values[0]);
             return trim("$min — $max");
         }
         return '';
-    }
-
-    if ($param_type === 'checkbox') {
+    } */
+	if ($param_type === 'range') {
+		// Возвращаем сохранённое число
+		return isset($values[0]) ? $values[0] : '';
+	}
+	if ($param_type === 'checkbox') {
+		$out = [];
+		foreach ((array)$values as $key) {
+			$display = marketprofilter_get_value($param_id, $key, $lang);
+			$display = htmlspecialchars($display);
+			$out[] = $display;
+		}
+		// ОДИН элемент → простая строка (как раньше)
+		if (count($out) === 1) {
+			return $out[0];
+		}
+		// НЕСКОЛЬКО элементов → HTML-список с точкой с запятой
+		$listItems = '';
+		$lastIdx = count($out) - 1;
+		foreach ($out as $i => $item) {
+			$suffix = ($i < $lastIdx) ? '; ' : '';
+			$listItems .= '<li>' . $item . $suffix . '</li>';
+		}
+		return '<ul>' . $listItems . '</ul>';
+	}
+/*     if ($param_type === 'checkbox') {
         $out = [];
         foreach ((array)$values as $key) {
             $out[] = marketprofilter_get_value($param_id, $key, $lang);
         }
         return implode(', ', $out);
-    }
-
+    } */
+/* 	if ($param_type === 'checkbox') {
+		$out = [];
+		foreach ((array)$values as $key) {
+			// Получаем переведённое название
+			$display = marketprofilter_get_value($param_id, $key, $lang);
+			// Экранируем от XSS (это текст внутри <li>)
+			$display = htmlspecialchars($display);
+			$out[] = $display;
+		}
+		// Формируем список: каждый пункт с точкой с запятой, кроме последнего
+		$listItems = '';
+		$lastIdx = count($out) - 1;
+		foreach ($out as $i => $item) {
+			$suffix = ($i < $lastIdx) ? ';' : '';   // точка с запятой кроме последнего
+			$listItems .= '<li>' . $item . $suffix . '</li>';
+		}
+		return '<ul>' . $listItems . '</ul>';
+	} */
     // select / radio
     $key = $values[0] ?? '';
     return $key !== '' ? marketprofilter_get_value($param_id, $key, $lang) : '';
@@ -331,6 +371,13 @@ function marketprofilter_form_fields(array $values): string
     $html .= '<textarea name="param_helpinfo" id="param_helpinfo" class="form-control" rows="2">' . $help_value . '</textarea>';
     $html .= '<div class="form-text">' . $L['marketprofilter_param_helpinfo_hint'] . '</div>';
     $html .= '</div>';
+    // param_hidelistitem
+    $checked_hidelist = !empty($values['param_hidelistitem']) ? ' checked' : '';
+    $html .= '<div class="form-check mb-3">';
+    $html .= '<input type="checkbox" name="param_hidelistitem" id="param_hidelistitem" class="form-check-input" value="1"' . $checked_hidelist . '>';
+    $html .= '<label for="param_hidelistitem" class="form-check-label">' . ($L['marketprofilter_param_hidelistitem'] ?? 'Свернуть список') . '</label>';
+    $html .= '<div class="form-text">' . ($L['marketprofilter_param_hidelistitem_hint'] ?? 'Список опций будет скрыт под спойлер') . '</div>';
+    $html .= '</div>';
     return $html;
 }
 
@@ -361,11 +408,13 @@ function marketprofilter_load_item_params($fieldmrkt_id)
 
         if ($type === 'checkbox') {
             $result[$name][] = $val;
-        } elseif ($type === 'range') {
+/*         } elseif ($type === 'range') {
             [$min, $max] = explode('-', $val);
             $result[$name]['min'] = (int)$min;
-            $result[$name]['max'] = (int)$max;
-        } else {
+            $result[$name]['max'] = (int)$max; */
+		} elseif ($type === 'range') {
+			$result[$name] = (int)$val;
+		} else {
             $result[$name] = $val;
         }
     }
@@ -654,6 +703,131 @@ function marketprofilter_get_faceted_counts($param_id, $current_cat = '') {
     return $counts;                                               // возвращаем массив
 }
 
+/**
+ * Подсчитывает количество товаров для range-параметра, попадающих в заданный интервал,
+ * с учётом других активных фильтров (кроме самого этого параметра).
+ *
+ * @param int    $param_id     ID параметра
+ * @param float  $min          нижняя граница поиска
+ * @param float  $max          верхняя граница поиска
+ * @param string $current_cat  код категории (или '' если без)
+ * @return int
+ */
+function marketprofilter_get_range_count($param_id, $min, $max, $current_cat = '') {
+    global $db, $db_x;
 
+    $table_params = $db_x . 'marketprofilter_params';
+    $table_values = $db_x . 'marketprofilter_params_values';
+    $table_market = $db_x . 'market';
 
+    // Собираем все активные фильтры, кроме текущего параметра
+    $all_params = $db->query("SELECT param_id, param_name, param_type FROM $table_params WHERE param_active = 1")->fetchAll();
+    $active_filters = [];
+    foreach ($all_params as $p) {
+        if ($p['param_id'] == $param_id) continue;
+        $key = "filter_{$p['param_name']}";
+        $val = $_GET[$key] ?? null;
+        if ($val === null || $val === '') continue;
+        if ($p['param_type'] === 'checkbox') {
+            if (!is_array($val)) $val = [$val];
+            $val = array_filter($val);
+            if (!$val) continue;
+        } elseif ($p['param_type'] === 'range') {
+            $val = trim($val);
+            if ($val === '') continue;
+        } else {
+            $val = trim($val);
+            if ($val === '') continue;
+        }
+        $active_filters[] = ['param_id' => $p['param_id'], 'type' => $p['param_type'], 'value' => $val];
+    }
 
+    // Строим JOIN и WHERE для других фильтров
+    $joins = '';
+    $where = [];
+    $i = 0;
+    if ($current_cat !== '') {
+        $where[] = "m.fieldmrkt_cat = " . $db->quote($current_cat);
+    }
+    foreach ($active_filters as $f) {
+        $alias = "rfc_$i";
+        $joins .= " INNER JOIN $table_values AS $alias ON $alias.fieldmrkt_id = m.fieldmrkt_id AND $alias.param_id = {$f['param_id']}";
+        $i++;
+        if ($f['type'] === 'range') {
+            if (strpos($f['value'], '-') !== false) {
+                [$fmin, $fmax] = array_map('floatval', explode('-', $f['value']));
+            } else {
+                $fmin = 0; $fmax = floatval($f['value']);
+            }
+            if ($fmax > 0) {
+                $where[] = "CAST($alias.param_value AS UNSIGNED) >= $fmin AND CAST($alias.param_value AS UNSIGNED) <= $fmax";
+            }
+        } elseif ($f['type'] === 'checkbox') {
+            $esc = implode(',', array_map([$db, 'quote'], (array)$f['value']));
+            $where[] = "$alias.param_value IN ($esc)";
+        } else {
+            $where[] = "$alias.param_value = " . $db->quote($f['value']);
+        }
+    }
+
+    // Основной запрос: считаем товары, у которых значение текущего параметра в [min, max]
+    $sql = "SELECT COUNT(DISTINCT m.fieldmrkt_id)
+            FROM $table_market m
+            INNER JOIN $table_values v ON v.fieldmrkt_id = m.fieldmrkt_id AND v.param_id = $param_id
+            $joins
+            WHERE CAST(v.param_value AS UNSIGNED) >= $min AND CAST(v.param_value AS UNSIGNED) <= $max"
+            . ($where ? ' AND ' . implode(' AND ', $where) : '');
+
+    return (int)$db->query($sql)->fetchColumn();
+}
+
+/**
+ * Проверяет, существует ли активный параметр фильтра с заданным именем
+ * и содержит ли его JSON-поле param_values указанное значение.
+ * Учитывает права доступа: если параметр помечен как суперадминский (param_superadmin=1),
+ * то функция вернёт true только для администратора (группа 5).
+ *
+ * @param string $param_name Имя параметра (например, '001_01_samokat_brand')
+ * @param string $value      Значение для проверки (например, 'kugoo')
+ * @return bool
+ */
+function marketprofilter_has_value($param_name, $value)
+{
+    global $db, $db_x;
+
+    static $cache = []; // кеш в памяти на время выполнения страницы
+    $cache_key = $param_name . '|' . $value;
+
+    if (array_key_exists($cache_key, $cache)) {
+        return $cache[$cache_key];
+    }
+
+    // Получаем параметр из БД
+    $sql = "SELECT param_values, param_superadmin 
+            FROM {$db_x}marketprofilter_params 
+            WHERE param_name = ? AND param_active = 1 
+            LIMIT 1";
+    $row = $db->query($sql, [$param_name])->fetch();
+
+    if (!$row) {
+        $cache[$cache_key] = false;
+        return false;
+    }
+
+    // Проверка суперадминского доступа
+    if (!empty($row['param_superadmin']) && !marketprofilter_is_admin()) {
+        $cache[$cache_key] = false;
+        return false;
+    }
+
+    // Декодируем JSON массив значений
+    $values = json_decode($row['param_values'], true);
+    if (!is_array($values)) {
+        $cache[$cache_key] = false;
+        return false;
+    }
+
+    $result = in_array($value, $values, true);
+    $cache[$cache_key] = $result;
+    return $result;
+}
