@@ -8,9 +8,9 @@ Parameter names and their values used for filtering are specified in the plugin 
 Parameter names can be generic for all products, as well as specialized (class-based).
 
 
-[![Version](https://img.shields.io/badge/version-3.3.36-green.svg)](https://github.com/webitproff/marketprofilter-cotonti/releases)
+[![Version](https://img.shields.io/badge/version-3.5.1-green.svg)](https://github.com/webitproff/marketprofilter-cotonti/releases)
 [![Cotonti Compatibility](https://img.shields.io/badge/Cotonti-v.1+-orange.svg)](https://github.com/Cotonti/Cotonti)
-[![PHP](https://img.shields.io/badge/PHP-8.4-purple.svg)](https://www.php.net/releases/8_4_0.php)
+[![PHP](https://img.shields.io/badge/PHP-8.5-purple.svg)](https://www.php.net/releases/8_5_0.php)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
 [![Bootstrap v5.3.8](https://img.shields.io/badge/Bootstrap-v5.3.8-blueviolet.svg)](https://getbootstrap.com/)
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/webitproff/marketprofilter-cotonti/blob/main/LICENSE)
