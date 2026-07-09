@@ -15,7 +15,9 @@ Parameter names can be generic for all products, as well as specialized (class-b
 [![Bootstrap v5.3.8](https://img.shields.io/badge/Bootstrap-v5.3.8-blueviolet.svg)](https://getbootstrap.com/)
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/webitproff/marketprofilter-cotonti/blob/main/LICENSE)
 
-<img src="https://raw.githubusercontent.com/webitproff/marketprofilter-cotonti/refs/heads/main/Market-PRO-product-filter-plugin-Cotonti-by-webitproff.webp" alt="Market PRO Filter plugin Cotonti CMF by webitproff">
+<img width="900" height="600" alt="Market PRO Filter plugin Cotonti CMF by webitproff" src="https://github.com/user-attachments/assets/050ce6f3-6ebd-4e6e-a411-11113167db57" />
+
+
 
 ---
 ### [Demo](https://abuyfile.com/ru/market/cotonti/plugs)
